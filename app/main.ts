@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { readFileSync } from "fs";
 
 async function main() {
   const [, , flag, prompt] = process.argv;
@@ -19,7 +20,8 @@ async function main() {
   });
 
   const response = await client.chat.completions.create({
-    model: "anthropic/claude-haiku-4.5", 
+    // using anthropic/claude-haiku-4.5 and deepseek/deepseek-v4.1-flash-1017
+    model: "anthropic/claude-haiku-4.5",
     messages: [{ role: "user", content: prompt }],
     tools: [
       {
@@ -46,10 +48,22 @@ async function main() {
     throw new Error("no choices in response");
   }
 
-  // You can use print statements as follows for debugging, they'll be visible when running tests.
-  console.error("Logs from your program will appear here!");
+  const message = response.choices[0].message;
 
-  console.log(response.choices[0].message.content);
+  if (message.tool_calls) {
+    for (const call of message.tool_calls) {
+      if (call.type !== "function") continue;
+
+      const args = JSON.parse(call.function.arguments)
+      
+      if (call.function.name === "Read") {
+        const contents = readFileSync(args.file_path, "utf8");
+        console.log(contents);
+      }
+    }
+  } else {
+    console.log(response.choices[0].message.content);
+  }
 }
 
 main();
