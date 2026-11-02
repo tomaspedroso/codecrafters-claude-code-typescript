@@ -19,7 +19,7 @@ async function main() {
   });
 
   const response = await client.chat.completions.create({
-    model: "deepseek/deepseek-v4.1-flash-1017",
+    model: "anthropic/claude-haiku-4.5",
     messages: [{ role: "user", content: prompt }],
   });
 
