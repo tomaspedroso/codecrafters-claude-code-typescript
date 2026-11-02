@@ -1,13 +1,19 @@
 import OpenAI from "openai";
-import { readFileSync } from "fs";
+import { readFileSync, writeFileSync } from "fs";
 
 function executeTool(name: string, args: any): string {
   try {
-    if (name === "Read") {
-      return readFileSync(args.file_path, "utf8");
+    switch (name) {
+      case "Read":
+        return readFileSync(args.file_path, "utf8");
+
+      case "Write":
+        writeFileSync(args.file_path, args.content);
+        return `Wrote ${args.content.length} characters to ${args.file_path}`;
+        
+      default:
+        return `Error: unknown tool ${name}`;
     }
-    
-    return `Error: unknown tool ${name}`; 
   } catch (err) {
     return `Error: ${err instanceof Error ? err.message : String(err)}`;
   }
@@ -55,6 +61,27 @@ async function main() {
                 }
               },
               required: ["file_path"],
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "Write",
+            description: "Write content to a file",
+            parameters: {
+              type: "object",
+              properties: {
+                file_path: {
+                  type: "string",
+                  description: "The path of the file to write to",
+                },
+                content: {
+                  type: "string",
+                  description: "The content to write to the file",
+                }
+              },
+              required: ["file_path", "content"],
             }
           }
         }
