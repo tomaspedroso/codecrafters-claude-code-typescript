@@ -43,22 +43,29 @@ export function loadSkill(
     .trim();
 }
 
-// turns "/apple a b" into the apple skill body with the arguments filled in:
-// $ARGUMENTS becomes "a b", $0 becomes "a", $1 becomes "b" (missing ones become "").
-// if the body has no placeholder, the arguments are appended after it instead.
-export function expandSkillPrompt(prompt: string): string {
-  if (!prompt.startsWith("/")) return prompt;
+// "/apple /grape a b" -> one message per leading skill, with the rest ("a b") as its arguments.
+// $ARGUMENTS is "a b", $0 is "a", $1 is "b"; without a placeholder the arguments are appended.
+export function expandSkillPrompt(prompt: string): string[] {
+  const tokens = prompt.trim().split(/\s+/);
 
-  const [command, ...args] = prompt.slice(1).trim().split(/\s+/);
-  const body = loadSkill(command);
-  if (body === null) return prompt; // not a skill, send the prompt unchanged
-
-  const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
-  if (!hasPlaceholder) {
-    return [body, args.join(" ")].filter(Boolean).join("\n\n");
+  const bodies: string[] = [];
+  while (bodies.length < tokens.length && tokens[bodies.length].startsWith("/")) {
+    const body = loadSkill(tokens[bodies.length].slice(1));
+    if (body === null) break;
+    bodies.push(body);
   }
+  if (bodies.length === 0) return [prompt];
 
-  return body
-    .replaceAll("$ARGUMENTS", args.join(" "))
-    .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "");
+  const args = tokens.slice(bodies.length);
+
+  return bodies.map((body) => {
+    const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
+    if (!hasPlaceholder) {
+      return [body, args.join(" ")].filter(Boolean).join("\n\n");
+    }
+
+    return body
+      .replaceAll("$ARGUMENTS", args.join(" "))
+      .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "");
+  });
 }

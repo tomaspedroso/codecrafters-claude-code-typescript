@@ -56,7 +56,10 @@ async function main() {
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
     ...(skills ? [{ role: "system" as const, content: skills }] : []),
-    { role: "user", content: expandSkillPrompt(prompt) },
+    ...expandSkillPrompt(prompt).map((content) => ({
+      role: "user" as const,
+      content,
+    })),
   ];
 
   while (true) {
