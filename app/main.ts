@@ -1,9 +1,39 @@
 import OpenAI from "openai";
-import { readFileSync, writeFileSync } from "fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
 import { exec } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
+
+function scanSkills(skillsDir = join(".claude", "skills")): string {
+  if (!existsSync(skillsDir)) return "";
+
+  const lines: string[] = [];
+
+  for (const entry of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+
+    const skillFile = join(skillsDir, entry.name, "SKILL.md");
+    if (!existsSync(skillFile)) continue;
+
+    // read name and description from the frontmatter between the --- lines
+    const frontmatter = readFileSync(skillFile, "utf8").match(
+      /^---\r?\n([\s\S]*?)\r?\n---/,
+    )?.[1];
+    if (!frontmatter) continue;
+
+    const name = frontmatter.match(/^name:\s*(.+)$/m)?.[1].trim();
+    const description = frontmatter.match(/^description:\s*(.+)$/m)?.[1].trim();
+    if (!name || !description) continue;
+
+    lines.push(`- ${name}: ${description}`);
+  }
+
+  if (lines.length === 0) return "";
+
+  return `You have access to the following skills:\n\n${lines.join("\n")}`;
+}
 
 async function executeTool(name: string, args: any): Promise<string> {
   try {
@@ -52,6 +82,7 @@ async function main() {
   });
 
   const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: "system", content: scanSkills() },
     { role: "user", content: prompt },
   ];
 
