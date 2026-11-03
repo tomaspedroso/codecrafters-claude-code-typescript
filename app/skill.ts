@@ -66,18 +66,34 @@ export function expandSkillPrompt(prompt: string): string[] {
   return skills.map(({ name, body }) => fillSkill(name, body, args));
 }
 
-// fills in the arguments and puts the skill's folder in front of the body
-export function fillSkill(name: string, body: string, args: string[]): string {
+// fills in the arguments, or appends them when the body has no placeholder
+export function substituteArguments(body: string, args: string[]): string {
   const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
-  const filled = hasPlaceholder
+
+  return hasPlaceholder
     ? body
         .replaceAll("$ARGUMENTS", args.join(" "))
         .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "")
     : [body, args.join(" ")].filter(Boolean).join("\n\n");
+}
 
+// fills in the arguments and puts the skill's folder in front of the body
+export function fillSkill(name: string, body: string, args: string[]): string {
   const header =
     `Skill: ${name} (located at ${join(SKILLS_DIR, name)})\n` +
     "Paths in the instructions below are relative to that folder.";
 
-  return `${header}\n\n${filled}`;
+  return `${header}\n\n${substituteArguments(body, args)}`;
+}
+
+// true if the skill's frontmatter has "context: fork", i.e. it runs in a subagent
+export function runsInSubagent(name: string, skillsDir = SKILLS_DIR): boolean {
+  const skillFile = join(skillsDir, name, "SKILL.md");
+  if (!existsSync(skillFile)) return false;
+
+  const frontmatter = readFileSync(skillFile, "utf8").match(
+    /^---\r?\n([\s\S]*?)\r?\n---/,
+  )?.[1];
+
+  return /^context:\s*fork\s*$/m.test(frontmatter ?? "");
 }
