@@ -29,7 +29,11 @@ export function scanSkills(skillsDir = SKILLS_DIR): string {
 
   if (lines.length === 0) return "";
 
-  return `You have access to the following skills:\n\n${lines.join("\n")}`;
+  return (
+    `You have access to the following skills:\n\n${lines.join("\n")}\n\n` +
+    "If a skill matches the user's request, call the Skill tool with its name\n" +
+    "and follow the instructions it returns."
+  );
 }
 
 // returns the body of a skill (everything after the frontmatter), or null if it doesn't exist
@@ -59,18 +63,21 @@ export function expandSkillPrompt(prompt: string): string[] {
 
   const args = tokens.slice(skills.length);
 
-  return skills.map(({ name, body }) => {
-    const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
-    const filled = hasPlaceholder
-      ? body
-          .replaceAll("$ARGUMENTS", args.join(" "))
-          .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "")
-      : [body, args.join(" ")].filter(Boolean).join("\n\n");
+  return skills.map(({ name, body }) => fillSkill(name, body, args));
+}
 
-    const header =
-      `Skill: ${name} (located at ${join(SKILLS_DIR, name)})\n` +
-      "Paths in the instructions below are relative to that folder.";
+// fills in the arguments and puts the skill's folder in front of the body
+export function fillSkill(name: string, body: string, args: string[]): string {
+  const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
+  const filled = hasPlaceholder
+    ? body
+        .replaceAll("$ARGUMENTS", args.join(" "))
+        .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "")
+    : [body, args.join(" ")].filter(Boolean).join("\n\n");
 
-    return `${header}\n\n${filled}`;
-  });
+  const header =
+    `Skill: ${name} (located at ${join(SKILLS_DIR, name)})\n` +
+    "Paths in the instructions below are relative to that folder.";
+
+  return `${header}\n\n${filled}`;
 }

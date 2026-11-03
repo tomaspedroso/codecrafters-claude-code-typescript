@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { readFileSync, writeFileSync } from "fs";
 import { exec } from "child_process";
 import { promisify } from "util";
-import { expandSkillPrompt, scanSkills } from "./skill";
+import { expandSkillPrompt, fillSkill, loadSkill, scanSkills } from "./skill";
 
 const execAsync = promisify(exec);
 
@@ -24,6 +24,14 @@ async function executeTool(name: string, args: any): Promise<string> {
           // exec rejects on a non-zero exit; keep the output so the model sees the failure
           return `${err.stdout ?? ""}${err.stderr ?? ""}\nExit code: ${err.code}`;
         }
+      }
+
+      case "Skill": {
+        const body = loadSkill(args.name);
+        if (body === null) return `Error: unknown skill ${args.name}`;
+
+        const skillArgs = (args.args ?? "").split(/\s+/).filter(Boolean);
+        return fillSkill(args.name, body, skillArgs);
       }
 
       default:
@@ -120,6 +128,27 @@ async function main() {
                 }
               },
               required: ["command"],
+            }
+          }
+        },
+        {
+          type: "function",
+          function: {
+            name: "Skill",
+            description: "Load a skill's instructions into the conversation",
+            parameters: {
+              type: "object",
+              properties: {
+                name: {
+                  type: "string",
+                  description: "The name of the skill to use",
+                },
+                args: {
+                  type: "string",
+                  description: "Optional arguments for the skill",
+                }
+              },
+              required: ["name"],
             }
           }
         }
