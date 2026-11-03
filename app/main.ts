@@ -1,7 +1,11 @@
 import OpenAI from "openai";
 import { readFileSync, writeFileSync } from "fs";
+import { exec } from "child_process";
+import { promisify } from "util";
 
-function executeTool(name: string, args: any): string {
+const execAsync = promisify(exec);
+
+async function executeTool(name: string, args: any): Promise<string> {
   try {
     switch (name) {
       case "Read":
@@ -10,7 +14,17 @@ function executeTool(name: string, args: any): string {
       case "Write":
         writeFileSync(args.file_path, args.content);
         return `Wrote ${args.content.length} characters to ${args.file_path}`;
-        
+
+      case "Bash": {
+        try {
+          const { stdout, stderr } = await execAsync(args.command);
+          return `${stdout}${stderr}`;
+        } catch (err: any) {
+          // exec rejects on a non-zero exit; keep the output so the model sees the failure
+          return `${err.stdout ?? ""}${err.stderr ?? ""}\nExit code: ${err.code}`;
+        }
+      }
+
       default:
         return `Error: unknown tool ${name}`;
     }
@@ -84,6 +98,23 @@ async function main() {
               required: ["file_path", "content"],
             }
           }
+        },
+        {
+          type: "function",
+          function: {
+            name: "Bash",
+            description: "Execute a shell command",
+            parameters: {
+              type: "object",
+              properties: {
+                command: {
+                  type: "string",
+                  description: "The command to execute",
+                }
+              },
+              required: ["command"],
+            }
+          }
         }
       ]
     });
@@ -104,7 +135,7 @@ async function main() {
       if (call.type !== "function") continue;
 
       const args = JSON.parse(call.function.arguments);
-      const result = executeTool(call.function.name, args);
+      const result = await executeTool(call.function.name, args);
 
       messages.push({
         role: "tool",
