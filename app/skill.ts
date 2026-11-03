@@ -44,7 +44,7 @@ export function loadSkill(
 }
 
 // turns "/apple a b" into the apple skill body with the arguments filled in:
-// $ARGUMENTS becomes "a b", $1 becomes "a", $2 becomes "b" (missing ones become "").
+// $ARGUMENTS becomes "a b", $0 becomes "a", $1 becomes "b" (missing ones become "").
 // if the body has no placeholder, the arguments are appended after it instead.
 export function expandSkillPrompt(prompt: string): string {
   if (!prompt.startsWith("/")) return prompt;
@@ -60,5 +60,5 @@ export function expandSkillPrompt(prompt: string): string {
 
   return body
     .replaceAll("$ARGUMENTS", args.join(" "))
-    .replace(/\$(\d)/g, (_, n) => args[Number(n) - 1] ?? "");
+    .replace(/\$(\d)/g, (_, n) => args[Number(n)] ?? "");
 }
