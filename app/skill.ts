@@ -43,13 +43,22 @@ export function loadSkill(
     .trim();
 }
 
-// turns "/apple do something" into the apple skill body followed by "do something"
+// turns "/apple a b" into the apple skill body with the arguments filled in:
+// $ARGUMENTS becomes "a b", $1 becomes "a", $2 becomes "b" (missing ones become "").
+// if the body has no placeholder, the arguments are appended after it instead.
 export function expandSkillPrompt(prompt: string): string {
   if (!prompt.startsWith("/")) return prompt;
 
-  const [command, ...rest] = prompt.slice(1).split(/\s+/);
+  const [command, ...args] = prompt.slice(1).trim().split(/\s+/);
   const body = loadSkill(command);
   if (body === null) return prompt; // not a skill, send the prompt unchanged
 
-  return [body, rest.join(" ")].filter(Boolean).join("\n\n");
+  const hasPlaceholder = /\$ARGUMENTS|\$\d/.test(body);
+  if (!hasPlaceholder) {
+    return [body, args.join(" ")].filter(Boolean).join("\n\n");
+  }
+
+  return body
+    .replaceAll("$ARGUMENTS", args.join(" "))
+    .replace(/\$(\d)/g, (_, n) => args[Number(n) - 1] ?? "");
 }
